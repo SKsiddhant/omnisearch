@@ -69,8 +69,6 @@ class OmniSearchEngine:
             try:
                 # 1. Get Image Embedding
                 emb = self.get_image_embedding(path)
-                embeddings.append(emb)
-                valid_paths.append(path)
                 
                 # 2. Zero-shot Auto-tagging
                 img_norm = emb / (np.linalg.norm(emb) + 1e-8)
@@ -80,11 +78,12 @@ class OmniSearchEngine:
                 category = self.cat_labels[np.argmax(img_norm @ cat_norm.T)]
                 color = self.color_labels[np.argmax(img_norm @ color_norm.T)]
 
+                embeddings.append(emb)
+                valid_paths.append(path)
                 colors.append(color)
                 categories.append(category)
                 
                 # 3. Feature: Price & Rating Simulation
-                # In a real app, this comes from a DB. Here we simulate based on category.
                 base_price = {"shoe": 50, "watch": 150, "laptop": 800, "backpack": 40, "shirt": 25}
                 prices.append(base_price.get(category, 50) + np.random.randint(-10, 50))
                 ratings.append(round(np.random.uniform(3.5, 5.0), 1))
@@ -107,6 +106,53 @@ class OmniSearchEngine:
             "price": prices,
             "rating": ratings
         })
+
+    def add_image(self, image, save_path):
+        """Adds a single image to the catalog dynamically."""
+        if not isinstance(image, Image.Image):
+            image = Image.open(image).convert("RGB")
+        
+        # Save image
+        image.save(save_path)
+        
+        # 1. Get Image Embedding
+        emb = self.get_image_embedding(image)
+        
+        # 2. Zero-shot Auto-tagging
+        cat_embs = np.vstack([self.get_text_embedding(f"a photo of a {l}") for l in self.cat_labels])
+        color_embs = np.vstack([self.get_text_embedding(f"a {l} colored object") for l in self.color_labels])
+        
+        img_norm = emb / (np.linalg.norm(emb) + 1e-8)
+        cat_norm = cat_embs / (np.linalg.norm(cat_embs, axis=1, keepdims=True) + 1e-8)
+        color_norm = color_embs / (np.linalg.norm(color_embs, axis=1, keepdims=True) + 1e-8)
+        
+        category = self.cat_labels[np.argmax(img_norm @ cat_norm.T)]
+        color = self.color_labels[np.argmax(img_norm @ color_norm.T)]
+        
+        # 3. Price & Rating
+        base_price = {"shoe": 50, "watch": 150, "laptop": 800, "backpack": 40, "shirt": 25}
+        price = base_price.get(category, 50) + np.random.randint(-10, 50)
+        rating = round(np.random.uniform(3.5, 5.0), 1)
+        
+        # 4. Update FAISS and Metadata
+        emb_idx = emb.astype('float32')
+        faiss.normalize_L2(emb_idx)
+        
+        if self.index is None:
+            self.index = faiss.IndexFlatIP(emb_idx.shape[1])
+            self.metadata = pd.DataFrame(columns=["image_path", "color", "category", "price", "rating"])
+            
+        self.index.add(emb_idx)
+        new_row = pd.DataFrame({
+            "image_path": [save_path],
+            "color": [color],
+            "category": [category],
+            "price": [price],
+            "rating": [rating]
+        })
+        self.metadata = pd.concat([self.metadata, new_row], ignore_index=True)
+        
+        return {"category": category, "color": color, "price": price, "rating": rating}
         
     def search(self, query, query_type="text", top_k=5, filters=None, text_query=None):
         """

@@ -29,19 +29,42 @@ def load_engine():
     image_dir = "data/sample_images"
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)
-        return None
     
     image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
     if image_paths:
         with st.spinner("Indexing catalog with zero-shot auto-tagging..."):
             engine.build_index(image_paths)
+    else:
+        # Initialize empty index if no images
+        engine.metadata = None 
     return engine
 
 engine = load_engine()
 
-if not engine:
-    st.error("No images found in `data/sample_images`. Please run the sample generator.")
-    st.stop()
+# --- Sidebar: Add New Product ---
+with st.sidebar:
+    st.divider()
+    with st.expander("➕ Add New Product to Catalog"):
+        new_img_file = st.file_uploader("Upload Product Image", type=["jpg", "png", "jpeg"], key="admin_upload")
+        if new_img_file:
+            st.image(new_img_file, caption="Preview", use_column_width=True)
+            if st.button("Add to Catalog"):
+                with st.spinner("Saving and indexing..."):
+                    # Save to data/sample_images
+                    img_name = f"custom_{len(os.listdir('data/sample_images')) + 1}.png"
+                    save_path = os.path.join("data/sample_images", img_name)
+                    
+                    try:
+                        info = engine.add_image(Image.open(new_img_file), save_path)
+                        st.success(f"Added! Detected: {info['color']} {info['category']}")
+                        st.balloons()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error adding image: {e}")
+
+if not engine or (engine.metadata is None and not os.listdir("data/sample_images")):
+    st.error("No images found in `data/sample_images`. Use the sidebar to add some!")
+    # We don't stop here anymore, we allow adding via sidebar
 
 col1, col2 = st.columns([1, 3])
 
@@ -118,11 +141,14 @@ with col2:
     else:
         # Default view: Show trending (random)
         st.subheader("Trending Now")
-        results = engine.metadata.sample(min(6, len(engine.metadata)))
-        cols = st.columns(3)
-        for i, (idx, row) in enumerate(results.iterrows()):
-            with cols[i % 3]:
-                st.image(Image.open(row['image_path']), caption=f"{row['color'].title()} {row['category'].title()}", use_column_width=True)
+        if engine.metadata is not None and not engine.metadata.empty:
+            results = engine.metadata.sample(min(6, len(engine.metadata)))
+            cols = st.columns(3)
+            for i, (idx, row) in enumerate(results.iterrows()):
+                with cols[i % 3]:
+                    st.image(Image.open(row['image_path']), caption=f"{row['color'].title()} {row['category'].title()}", use_column_width=True)
+        else:
+            st.info("Catalog is empty. Add products in the sidebar or run the sample generator.")
 
 st.sidebar.markdown(f"""
 ### 🧬 OmniSearch Tech Stack
