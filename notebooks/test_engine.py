@@ -12,7 +12,10 @@ def test_engine():
     engine = OmniSearchEngine()
     
     image_dir = "data/sample_images"
-    image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    if not os.path.isdir(image_dir):
+        print("No data/sample_images folder found. Run `python data/generate_samples.py` first.")
+        return False
+    image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     
     if not image_paths:
         print("No images found for testing.")
