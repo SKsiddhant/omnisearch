@@ -1,1 +1,6 @@
 pytest
+# Test suite stubs torch/transformers, so only these lightweight deps are needed:
+numpy
+pandas
+pillow
+faiss-cpu
