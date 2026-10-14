@@ -85,3 +85,10 @@ def test_label_embeddings_are_cached(engine, catalog, monkeypatch):
     monkeypatch.setattr(engine, "get_text_embedding", lambda t: calls.append(t) or orig(t))
     engine.build_index(catalog[:2])
     assert calls == []
+
+
+def test_add_image_converts_non_rgb_uploads(engine, tmp_path):
+    rgba = image_for("shoe", "red").convert("RGBA")
+    engine.add_image(rgba, str(tmp_path / "rgba.png"))
+    from PIL import Image as _I
+    assert _I.open(tmp_path / "rgba.png").mode == "RGB"

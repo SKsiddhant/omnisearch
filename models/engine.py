@@ -114,7 +114,8 @@ class OmniSearchEngine:
     def add_image(self, image, save_path):
         """Adds a single image to the catalog dynamically."""
         if not isinstance(image, Image.Image):
-            image = Image.open(image).convert("RGB")
+            image = Image.open(image)
+        image = image.convert("RGB")  # uploads can be RGBA/palette/CMYK; embed and save a consistent mode
 
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
         image.save(save_path)
