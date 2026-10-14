@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image
 import os
 import sys
+import uuid
 
 # Add parent directory to path to import engine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -30,7 +31,7 @@ def load_engine():
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)
     
-    image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     if image_paths:
         with st.spinner("Indexing catalog with zero-shot auto-tagging..."):
             engine.build_index(image_paths)
@@ -47,11 +48,11 @@ with st.sidebar:
     with st.expander("➕ Add New Product to Catalog"):
         new_img_file = st.file_uploader("Upload Product Image", type=["jpg", "png", "jpeg"], key="admin_upload")
         if new_img_file:
-            st.image(new_img_file, caption="Preview", use_column_width=True)
+            st.image(new_img_file, caption="Preview", use_container_width=True)
             if st.button("Add to Catalog"):
                 with st.spinner("Saving and indexing..."):
                     # Save to data/sample_images
-                    img_name = f"custom_{len(os.listdir('data/sample_images')) + 1}.png"
+                    img_name = f"custom_{uuid.uuid4().hex[:8]}.png"  # unique: a count-based name overwrites an existing file once any image is deleted
                     save_path = os.path.join("data/sample_images", img_name)
                     
                     try:
@@ -128,7 +129,7 @@ with col2:
                                     with cols[c]:
                                         with st.container():
                                             st.markdown('<div class="product-card">', unsafe_allow_html=True)
-                                            st.image(Image.open(row['image_path']), use_column_width=True)
+                                            st.image(Image.open(row['image_path']), use_container_width=True)
                                             st.markdown(f"**{row['color'].title()} {row['category'].title()}**")
                                             st.markdown(f'<span class="price">${row["price"]}</span>', unsafe_allow_html=True)
                                             st.markdown(f'<span class="rating">{"★" * int(row["rating"])}{"☆" * (5-int(row["rating"]))} ({row["rating"]})</span>', unsafe_allow_html=True)
@@ -146,14 +147,14 @@ with col2:
             cols = st.columns(3)
             for i, (idx, row) in enumerate(results.iterrows()):
                 with cols[i % 3]:
-                    st.image(Image.open(row['image_path']), caption=f"{row['color'].title()} {row['category'].title()}", use_column_width=True)
+                    st.image(Image.open(row['image_path']), caption=f"{row['color'].title()} {row['category'].title()}", use_container_width=True)
         else:
             st.info("Catalog is empty. Add products in the sidebar or run the sample generator.")
 
 st.sidebar.markdown(f"""
 ### 🧬 OmniSearch Tech Stack
 - **Vision-Language Model:** CLIP
-- **Vector Engine:** FAISS (Approximate Nearest Neighbors)
+- **Vector Engine:** FAISS (exact inner-product search)
 - **Tagging:** Zero-Shot Inference
 - **Backend:** PyTorch + Pandas
 - **Device:** `{engine.device.upper()}`
